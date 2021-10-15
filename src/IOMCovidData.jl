@@ -2,6 +2,8 @@ module IOMCovidData
 
 using PDFIO, DataFrames, Dates, CSV, HTTP, EzXML
 
+export getPDFs, processPDFs, updatedatacsv
+
 # A routine to extract data from the IOM Government pdf snapshots
 
 function getPDFs(folder=""; overwrite = false)
@@ -47,6 +49,7 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
 
     #select only valid files for processing
     prolst = lst[lst .>= firstpdf]
+    filter!(x->occursin(r".pdf$",x),prolst)
 
     #initialise variables
     io = IOBuffer()
@@ -58,7 +61,7 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
         
         #open pdf file for reading
         worked = true
-        println(folder*pdname)
+        @info "Processing: " filename=folder*pdname
         p = nothing
         try
             p = pdDocOpen(folder*pdname)
@@ -166,7 +169,8 @@ function updatedatacsv(folder;update=true)
     df = outerjoin(df1,df2, on=:Date, makeunique=true)
     select!(df,Not(r"^x\d"))
     data = vcat(data,df)
-    CSV.write(csvfile,data)
+    CSV.write(folder*"data.csv",data)
+    @info "Updated data.csv with:" data = data
 end
 
 end
