@@ -27,8 +27,8 @@ function getPDFs(folder=""; overwrite = false)
 
         pdfurls = hcat(Date.(getindex.(match.(r"(\d{1,2}\s\w+\s\d{4})",pdfurls[:,1]),1), "d U Y"), pdfurls[:,2])
         pdfurls = hcat(pdfurls, Dates.format.(pdfurls[:,1],"yyyy-mm-dd") .* ".pdf")
-        function downloadpdf(url, date)
-            filepath = folder * date
+        function downloadpdf(url, filename)
+            filepath = joinpath(folder,filename)
             if overwrite || !isfile(filepath)
                 download(url,filepath)
                 filepath
@@ -61,10 +61,10 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
         
         #open pdf file for reading
         worked = true
-        @info "Processing: " filename=folder*pdname
+        @info "Processing: " filename=joinpath(folder,pdname)
         p = nothing
         try
-            p = pdDocOpen(folder*pdname)
+            p = pdDocOpen(joinpath(folder,pdname))
         catch e
             worked = false    
         end
@@ -73,7 +73,7 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
             #routine to extract relevant data from page 8
             pdPageExtractText(io,pdDocGetPage(p, 8))
             data = String(take!(io))
-
+            filedate = Date(pdname[1:10])
             date =
                 try
                     Date(match(r"Default Date\s+(\d\d/\d\d/\d\d\d\d)",data).captures[1],"dd/mm/yyyy")
@@ -82,41 +82,41 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
                 end
             tests =
                 try
-                    parse(Int64,replace(match(r"((?:\d|,)+)\s+TESTS",data).captures[1],","=>""))
+                    parse(Int64,replace(match(r"((?:\d|,)+)\s*TESTS",data).captures[1],","=>""))
                 catch e
                     -1
                 end
             concluded =
                 try
-                    parse(Int64,replace(match(r"TESTS(?:.|\R)+?((?:\d|,)+)\s+TESTS",data).captures[1],","=>""))
+                    parse(Int64,replace(match(r"TESTS(?:.|\R)+?((?:\d|,)+)\s*TESTS",data).captures[1],","=>""))
                 catch e
                     -1
                 end
             rate = 
                 try
-                    parse(Float64,replace(match(r"((?:\d|\.)+)%\s+RATE",data).captures[1],"%"=>""))
+                    parse(Float64,replace(match(r"((?:\d|\.)+)%",data).captures[1],"%"=>""))
                 catch e
                     -1
                 end
             awaitresult = 
                 try
-                    parse(Int64,replace(match(r"((?:\d|,)+)\s+AWAITING RESULT",data).captures[1],","=>""))
+                    parse(Int64,replace(match(r"((?:\d|,)+)\s*AWAITING RESULT",data).captures[1],","=>""))
                 catch e
                     -1
                 end
             bookedtest =
                 try
-                    parse(Int64,replace(match(r"((?:\d|,)+)\s+BOOKED TESTS",data).captures[1],","=>""))
+                    parse(Int64,replace(match(r"((?:\d|,)+)\s*BOOKED TESTS",data).captures[1],","=>""))
                 catch e
                     -1
                 end
-            push!(testingOutput, [date, tests, concluded, rate, awaitresult, bookedtest])
+            push!(testingOutput, [filedate, date, tests, concluded, rate, awaitresult, bookedtest])
 
             #routine to extract relevant data from page 1
             pdPageExtractText(io,pdDocGetPage(p, 1))
             data = String(take!(io))
 
-            date =
+            refreshdate =
                 try
                     Date(match(r"Data Last Refreshed\s+(\d\d/\d\d/\d\d\d\d)",data).captures[1],"dd/mm/yyyy")
                 catch e
@@ -144,7 +144,7 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
             topush
             
             
-            push!(frontOutput, [date, topush...])
+            push!(frontOutput, [filedate, refreshdate, topush...])
 
             pdDocClose(p)
         end
@@ -156,7 +156,7 @@ end
 function updatedatacsv(folder;update=true)
     getPDFs(folder)
     if update
-        data = CSV.read(joinpath(folder*"data.csv"),DataFrame)
+        data = CSV.read(joinpath(folder,"data.csv"),DataFrame)
         lastdate = maximum(data.Date)
         firstpdf = Dates.format(lastdate+Dates.Day(1),"Y-mm-dd")*".pdf"
         frontOutput, testingOutput = processPDFs(folder,firstpdf=firstpdf)
@@ -164,12 +164,18 @@ function updatedatacsv(folder;update=true)
         data = DataFrame()
         frontOutput, testingOutput = processPDFs(folder)
     end
-    df1 = DataFrame(permutedims(hcat(frontOutput...),(2,1)),[:Date,:Community,:ActiveCases,:Hospital,:x5,:x6,:x7,:x8,:x9,:x10,:Investigated,:New,:PendingInvestigation,:Closed,:x15,:x16,:x17,:x18,:x19,:x20,:x21,:x22,:x23,:x24])
-    df2 = DataFrame(permutedims(hcat(testingOutput...),(2,1)),[:Date,:x2,:x3,:x4,:Tests,:BookedTomorrow])
+    df1 = DataFrame(permutedims(hcat(frontOutput...),(2,1)),[:Date,:RefreshDate,:Community,:ActiveCases,:Hospital,:x5,:x6,:x7,:x8,:x9,:x10,:Investigated,:New,:PendingInvestigation,:Closed,:x15,:x16,:x17,:x18,:x19,:x20,:x21,:x22,:x23,:x24])
+    df2 = DataFrame(permutedims(hcat(testingOutput...),(2,1)),[:Date,:DefaultDate,:Tests,:Concluded,:Rate,:Awaiting,:BookedTomorrow])
     df = outerjoin(df1,df2, on=:Date, makeunique=true)
     select!(df,Not(r"^x\d"))
     data = vcat(data,df)
-    CSV.write(folder*"data.csv",data)
+    data[:,:Source] .= "pdf"
+    manual = CSV.read(joinpath("data","manual.csv"),DataFrame)
+    manual[:,:Source] .= "manual"
+    data = antijoin(data,manual,on=:Date)
+    data = vcat(data,manual)
+    sort!(data,:Date)
+    CSV.write(joinpath(folder,"data.csv"),data)
     @info "Updated data.csv with:" data = data
 end
 
