@@ -153,10 +153,34 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
     frontOutput, testingOutput
 end
 
+function getIOMCovidData(folder="data")
+    CSV.read(joinpath(folder,"data.csv"),DataFrame)
+end
+
+function getJerseyCovidData()
+    r = HTTP.request("GET","https://www.gov.je/Datasets/ListOpenData?ListName=COVID19")
+    CSV.read(r.body,DataFrame)
+end
+
+function getOWIDCovidData()
+    r = HTTP.request("GET","https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/owid-covid-data.csv")
+    CSV.read(r.body,DataFrame)
+end
+
+function getUKCovidData()
+    data = getOWIDCovidData()
+    data[data.location .== "United Kingdom",:]
+end
+
+function getAllData()
+    data = outerjoin(getIOMCovidData(),getUKCovidData(),on=[:Date=>:date],makeunique=true)
+    data = outerjoin(data,getJerseyCovidData(),on=:Date,makeunique=true)
+end
+
 function updatedatacsv(folder;update=true)
     getPDFs(folder)
     if update
-        data = CSV.read(joinpath(folder,"data.csv"),DataFrame)
+        data = getIOMCovidData(folder)
         lastdate = maximum(data.Date)
         firstpdf = Dates.format(lastdate+Dates.Day(1),"Y-mm-dd")*".pdf"
         frontOutput, testingOutput = processPDFs(folder,firstpdf=firstpdf)
@@ -164,18 +188,21 @@ function updatedatacsv(folder;update=true)
         data = DataFrame()
         frontOutput, testingOutput = processPDFs(folder)
     end
-    df1 = DataFrame(permutedims(hcat(frontOutput...),(2,1)),[:Date,:RefreshDate,:Community,:ActiveCases,:Hospital,:x5,:x6,:x7,:x8,:x9,:x10,:Investigated,:New,:PendingInvestigation,:Closed,:x15,:x16,:x17,:x18,:x19,:x20,:x21,:x22,:x23,:x24])
-    df2 = DataFrame(permutedims(hcat(testingOutput...),(2,1)),[:Date,:DefaultDate,:Tests,:Concluded,:Rate,:Awaiting,:BookedTomorrow])
-    df = outerjoin(df1,df2, on=:Date, makeunique=true)
-    select!(df,Not(r"^x\d"))
-    data = vcat(data,df)
-    data[:,:Source] .= "pdf"
-    manual = CSV.read(joinpath("data","manual.csv"),DataFrame)
-    manual[:,:Source] .= "manual"
-    data = antijoin(data,manual,on=:Date)
-    data = vcat(data,manual)
-    sort!(data,:Date)
+    if length(frontOutput) > 0
+        df1 = DataFrame(permutedims(hcat(frontOutput...),(2,1)),[:Date,:RefreshDate,:Community,:ActiveCases,:Hospital,:x5,:x6,:x7,:x8,:x9,:x10,:Investigated,:New,:PendingInvestigation,:Closed,:x15,:x16,:x17,:x18,:x19,:x20,:x21,:x22,:x23,:x24])
+        df2 = DataFrame(permutedims(hcat(testingOutput...),(2,1)),[:Date,:DefaultDate,:Tests,:Concluded,:Rate,:Awaiting,:BookedTomorrow])
+        df = outerjoin(df1,df2, on=:Date, makeunique=true)
+        select!(df,Not(r"^x\d"))
+        data = vcat(data,df)
+        data[:,:Source] .= "pdf"
+        manual = CSV.read(joinpath("data","manual.csv"),DataFrame)
+        manual[:,:Source] .= "manual"
+        data = antijoin(data,manual,on=:Date)
+        data = vcat(data,manual)
+        sort!(data,:Date)
+    end
     CSV.write(joinpath(folder,"data.csv"),data)
+    CSV.write(joinpath("data","data.csv"),data)
     @info "Updated data.csv with:" data = data
 end
 
