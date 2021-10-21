@@ -193,8 +193,8 @@ function updatedatacsv(folder;update=true)
         df2 = DataFrame(permutedims(hcat(testingOutput...),(2,1)),[:Date,:DefaultDate,:Tests,:Concluded,:Rate,:Awaiting,:BookedTomorrow])
         df = outerjoin(df1,df2, on=:Date, makeunique=true)
         select!(df,Not(r"^x\d"))
-        data = vcat(data,df)
         data[:,:Source] .= "pdf"
+        data = vcat(data,df)
         manual = CSV.read(joinpath("data","manual.csv"),DataFrame)
         manual[:,:Source] .= "manual"
         data = antijoin(data,manual,on=:Date)
