@@ -196,14 +196,14 @@ function updatedatacsv(folder;update=true)
         df[:,:Source] .= "pdf"
 
         data = vcat(data,df)
-        manual = CSV.read(joinpath("data","manual.csv"),DataFrame)
+        manual = CSV.read(joinpath(folder,"manual.csv"),DataFrame)
         manual[:,:Source] .= "manual"
         data = antijoin(data,manual,on=:Date)
         data = vcat(data,manual)
         sort!(data,:Date)
     end
     CSV.write(joinpath(folder,"data.csv"),data)
-    CSV.write(joinpath("data","data.csv"),data)
+    #CSV.write(joinpath("data","data.csv"),data)
     @info "Updated data.csv with:" data = data
 end
 
