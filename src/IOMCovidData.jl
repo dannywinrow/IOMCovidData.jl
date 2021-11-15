@@ -177,7 +177,7 @@ function getAllData()
     data = outerjoin(data,getJerseyCovidData(),on=:Date,makeunique=true)
 end
 
-function updatedatacsv(folder;update=true)
+function updatedatacsv(folder;update=true,updatemanual=true)
     getPDFs(folder)
     if update
         data = getIOMCovidData(folder)
@@ -194,14 +194,16 @@ function updatedatacsv(folder;update=true)
         df = outerjoin(df1,df2, on=:Date, makeunique=true)
         select!(df,Not(r"^x\d"))
         df[:,:Source] .= "pdf"
-
         data = vcat(data,df)
+    end
+    if updatemanual
         manual = CSV.read(joinpath(folder,"manual.csv"),DataFrame)
         manual[:,:Source] .= "manual"
         data = antijoin(data,manual,on=:Date)
         data = vcat(data,manual)
         sort!(data,:Date)
     end
+
     CSV.write(joinpath(folder,"data.csv"),data)
     #CSV.write(joinpath("data","data.csv"),data)
     @info "Updated data.csv with:" data = data
