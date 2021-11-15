@@ -49,7 +49,7 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
 
     #select only valid files for processing
     prolst = lst[lst .>= firstpdf]
-    filter!(x->occursin(r".pdf$",x),prolst)
+    filter!(x->occursin(r"\d{4}-\d{2}-\d{2}.pdf$",x),prolst)
 
     #initialise variables
     io = IOBuffer()
