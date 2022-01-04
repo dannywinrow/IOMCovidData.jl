@@ -70,48 +70,50 @@ function processPDFs(folder; firstpdf = "2021-07-29.pdf")
         end
         if worked
 
-            #routine to extract relevant data from page 8
-            pdPageExtractText(io,pdDocGetPage(p, 8))
-            data = String(take!(io))
-            filedate = Date(pdname[1:10])
-            date =
-                try
-                    Date(match(r"Default Date\s+(\d\d/\d\d/\d\d\d\d)",data).captures[1],"dd/mm/yyyy")
-                catch e
-                    0
-                end
-            tests =
-                try
-                    parse(Int64,replace(match(r"((?:\d|,)+)\s*TESTS",data).captures[1],","=>""))
-                catch e
-                    -1
-                end
-            concluded =
-                try
-                    parse(Int64,replace(match(r"TESTS(?:.|\R)+?((?:\d|,)+)\s*TESTS",data).captures[1],","=>""))
-                catch e
-                    -1
-                end
-            rate = 
-                try
-                    parse(Float64,replace(match(r"((?:\d|\.)+)%",data).captures[1],"%"=>""))
-                catch e
-                    -1
-                end
-            awaitresult = 
-                try
-                    parse(Int64,replace(match(r"((?:\d|,)+)\s*AWAITING RESULT",data).captures[1],","=>""))
-                catch e
-                    -1
-                end
-            bookedtest =
-                try
-                    parse(Int64,replace(match(r"((?:\d|,)+)\s*BOOKED TESTS",data).captures[1],","=>""))
-                catch e
-                    -1
-                end
-            push!(testingOutput, [filedate, date, tests, concluded, rate, awaitresult, bookedtest])
-
+            if pdDocGetPageCount(p) >= 8
+                #routine to extract relevant data from page 8
+                pdPageExtractText(io,pdDocGetPage(p, 8))
+                data = String(take!(io))
+                filedate = Date(pdname[1:10])
+                date =
+                    try
+                        Date(match(r"Default Date\s+(\d\d/\d\d/\d\d\d\d)",data).captures[1],"dd/mm/yyyy")
+                    catch e
+                        0
+                    end
+                tests =
+                    try
+                        parse(Int64,replace(match(r"((?:\d|,)+)\s*TESTS",data).captures[1],","=>""))
+                    catch e
+                        -1
+                    end
+                concluded =
+                    try
+                        parse(Int64,replace(match(r"TESTS(?:.|\R)+?((?:\d|,)+)\s*TESTS",data).captures[1],","=>""))
+                    catch e
+                        -1
+                    end
+                rate = 
+                    try
+                        parse(Float64,replace(match(r"((?:\d|\.)+)%",data).captures[1],"%"=>""))
+                    catch e
+                        -1
+                    end
+                awaitresult = 
+                    try
+                        parse(Int64,replace(match(r"((?:\d|,)+)\s*AWAITING RESULT",data).captures[1],","=>""))
+                    catch e
+                        -1
+                    end
+                bookedtest =
+                    try
+                        parse(Int64,replace(match(r"((?:\d|,)+)\s*BOOKED TESTS",data).captures[1],","=>""))
+                    catch e
+                        -1
+                    end
+                push!(testingOutput, [filedate, date, tests, concluded, rate, awaitresult, bookedtest])
+            end
+            
             #routine to extract relevant data from page 1
             pdPageExtractText(io,pdDocGetPage(p, 1))
             data = String(take!(io))
